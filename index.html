@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Precision Grapher v64.0</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; justify-content: center; padding: 20px; }
+        #container { border: 3px solid #0f0; padding: 20px; width: 650px; background: #000; box-shadow: 0 0 20px #030; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #030; padding-bottom: 5px; }
+        input { background: #000; color: #0f0; border: 1px solid #0f0; padding: 10px; width: 300px; outline: none; }
+        canvas { background: #000; border: 1px solid #050; cursor: crosshair; }
+        .hud { font-size: 11px; color: #0f0; margin-top: 10px; display: flex; justify-content: space-between; }
+        button { background: #0f0; color: #000; border: none; padding: 8px 15px; font-weight: bold; cursor: pointer; margin-left: 5px; }
+        button:hover { background: #fff; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div class="header">
+        <span>CORE_OS_v64.0</span>
+        <span id="coords">X: 0.00 Y: 0.00</span>
+    </div>
+
+    <div style="margin-bottom: 15px;">
+        <input type="text" id="eqInput" value="sin(x!)">
+        <button onclick="zoom(0.5)">-</button>
+        <button onclick="zoom(2.0)">+</button>
+    </div>
+
+    <canvas id="canvas" width="600" height="400"></canvas>
+
+    <div class="hud">
+        <span>ZOOM_FACTOR: <span id="zVal">100</span>%</span>
+        <span>STATUS: SYSTEM_NOMINAL</span>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const eqInput = document.getElementById('eqInput');
+    let scale = 40;
+
+    // The Mathematical Engine (Gamma Function)
+    function gamma(n) {
+        if (n < 0) return Math.PI / (Math.sin(Math.PI * n) * gamma(1 - n));
+        if (n === 0) return 1e6;
+        let p = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+        let g = 7; let m = n - 1;
+        let x = p[0];
+        for (let i = 1; i < g + 2; i++) x += p[i] / (m + i);
+        let t = m + g + 0.5;
+        return Math.sqrt(2 * Math.PI) * Math.pow(t, m + 0.5) * Math.exp(-t) * x;
+    }
+
+    function draw() {
+        const w = canvas.width, h = canvas.height;
+        const cX = w / 2, cY = h / 2;
+        ctx.clearRect(0, 0, w, h);
+
+        // Draw Axes
+        ctx.strokeStyle = '#fff2';
+        ctx.beginPath(); ctx.moveTo(cX, 0); ctx.lineTo(cX, h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, cY); ctx.lineTo(w, cY); ctx.stroke();
+
+        let rawEq = eqInput.value.toLowerCase()
+            .replace(/(\d)(x)/g, '$1*$2')
+            .replace(/sin/g, 'Math.sin').replace(/cos/g, 'Math.cos')
+            .replace(/tan/g, 'Math.tan').replace(/abs/g, 'Math.abs').replace(/\^/g, '**');
+
+        if(rawEq.includes('!')) {
+            let parts = rawEq.split('!');
+            rawEq = "gamma(" + parts[0] + " + 1)" + (parts[1] || "");
+        }
+
+        try {
+            const f = new Function('x', 'gamma', `return ${rawEq}`);
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            let first = true;
+            let lastY = 0;
+
+            for(let px = 0; px <= w; px++) {
+                let x = (px - cX) / scale;
+                let y = f(x, gamma);
+                let py = cY - (y * scale);
+
+                if (isNaN(y) || !isFinite(y) || Math.abs(py) > 10000 || (px > 0 && Math.abs(py - lastY) > h)) {
+                    first = true;
+                } else {
+                    if (first) { ctx.moveTo(px, py); first = false; }
+                    else ctx.lineTo(px, py);
+                }
+                lastY = py;
+            }
+            ctx.stroke();
+        } catch(e) {}
+    }
+
+    function zoom(f) { scale *= f; document.getElementById('zVal').innerText = Math.round(scale/40*100); draw(); }
+    
+    // Mouse Tracking Logic
+    canvas.onmousemove = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - canvas.width/2) / scale;
+        const y = -(e.clientY - rect.top - canvas.height/2) / scale;
+        document.getElementById('coords').innerText = `X: ${x.toFixed(2)} Y: ${y.toFixed(2)}`;
+    };
+
+    eqInput.oninput = draw;
+    draw();
+</script>
+
+</body>
+</html>
